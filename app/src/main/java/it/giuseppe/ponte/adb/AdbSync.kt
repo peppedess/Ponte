@@ -10,20 +10,40 @@ object AdbSync {
 
     private const val MAX_CHUNK = 64 * 1024
 
-    fun push(adb: AbsAdbConnectionManager, data: ByteArray, remotePath: String, mode: Int = 420 /* 0644 */) {
+    fun push(adb: AbsAdbConnectionManager, data: ByteArray, remotePath: String, mode: Int = 420 /* 0644 */) =
+        push(adb, data.inputStream(), remotePath, mode) { }
+
+    /** Invia un file letto da [input], chiamando [onProgress] con i byte inviati finora. */
+    fun push(
+        adb: AbsAdbConnectionManager,
+        input: java.io.InputStream,
+        remotePath: String,
+        mode: Int = 420,
+        onProgress: (Long) -> Unit,
+    ) {
         val stream = adb.openStream("sync:")
         try {
             val spec = "$remotePath,$mode".toByteArray(Charsets.UTF_8)
             stream.write(header("SEND", spec.size) + spec, 0, 8 + spec.size)
 
-            var offset = 0
-            while (offset < data.size) {
-                val n = minOf(MAX_CHUNK, data.size - offset)
+            val chunk = ByteArray(MAX_CHUNK)
+            var sent = 0L
+            while (true) {
+                var n = 0
+                // Riempie il blocco il più possibile (meno pacchetti = più veloce)
+                while (n < MAX_CHUNK) {
+                    val r = input.read(chunk, n, MAX_CHUNK - n)
+                    if (r < 0) break
+                    n += r
+                }
+                if (n == 0) break
                 val packet = ByteArray(8 + n)
                 System.arraycopy(header("DATA", n), 0, packet, 0, 8)
-                System.arraycopy(data, offset, packet, 8, n)
+                System.arraycopy(chunk, 0, packet, 8, n)
                 stream.write(packet, 0, packet.size)
-                offset += n
+                sent += n
+                onProgress(sent)
+                if (n < MAX_CHUNK) break
             }
 
             val mtime = (System.currentTimeMillis() / 1000).toInt()

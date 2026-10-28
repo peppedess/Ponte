@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ponte</string>
+    <string name="widget_description">Avvia il desktop del telefono collegato con un tocco</string>
+    <string name="shortcut_start_short">Avvia desktop</string>
+    <string name="shortcut_start_long">Avvia il desktop del telefono</string>
+    <string name="share_label">Invia al telefono</string>
+</resources>

@@ -8,6 +8,27 @@ plugins {
 
 val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
+/** Copia il ponte TCP compilato dal modulo :relay negli asset dell'app (ponte-relay.jar). */
+abstract class CopyRelayTask : DefaultTask() {
+    @get:InputFile
+    abstract val relayApk: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile
+        out.mkdirs()
+        relayApk.get().asFile.copyTo(File(out, "ponte-relay.jar"), overwrite = true)
+    }
+}
+
+val copyRelay = tasks.register<CopyRelayTask>("copyRelay") {
+    dependsOn(":relay:assembleRelease")
+    relayApk.set(rootProject.layout.projectDirectory.file("relay/build/outputs/apk/release/relay-release-unsigned.apk"))
+}
+
 android {
     namespace = "it.giuseppe.ponte"
     compileSdk = 36
@@ -72,6 +93,12 @@ android {
 
     lint {
         checkReleaseBuilds = false
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyRelay, CopyRelayTask::outputDir)
     }
 }
 

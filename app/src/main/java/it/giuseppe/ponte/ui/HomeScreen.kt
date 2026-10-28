@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.TouchApp
@@ -33,7 +34,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -49,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,15 +69,17 @@ import androidx.compose.ui.unit.dp
 import it.giuseppe.ponte.Codec
 import it.giuseppe.ponte.Prefs
 import it.giuseppe.ponte.Resolution
+import it.giuseppe.ponte.Diag
 import it.giuseppe.ponte.adb.GalaxyLink
+import it.giuseppe.ponte.scrcpy.SessionState
+import it.giuseppe.ponte.session.SessionManager
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
-fun HomeScreen(onStart: () -> Unit) {
+fun HomeScreen(onStart: () -> Unit, onAddDevice: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { Prefs.get(context) }
-    var showPair by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
@@ -80,6 +87,18 @@ fun HomeScreen(onStart: () -> Unit) {
         topBar = {
             LargeTopAppBar(
                 title = { Text("Ponte", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    var menu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menu = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Esporta registro") },
+                            onClick = { menu = false; Diag.share(context) },
+                        )
+                    }
+                },
                 scrollBehavior = scroll,
             )
         },
@@ -95,7 +114,7 @@ fun HomeScreen(onStart: () -> Unit) {
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item { HeroCard(prefs, onStart = onStart, onPair = { showPair = true }) }
+                item { HeroCard(prefs, onStart = onStart, onPair = onAddDevice) }
                 if (prefs.devices.size > 1) {
                     item { DevicesRow(prefs) }
                 }
@@ -107,13 +126,12 @@ fun HomeScreen(onStart: () -> Unit) {
         }
     }
 
-    if (showPair) {
-        PairSheet(onDismiss = { showPair = false })
-    }
 }
 
 @Composable
 private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
+    val status by SessionManager.status.collectAsState()
+    val active = status !is SessionState.Closed
     Card(
         shape = RoundedCornerShape(32.dp),
         colors = CardDefaults.cardColors(
@@ -168,7 +186,7 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 ) {
                     Icon(Icons.Rounded.DesktopWindows, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
-                    Text(prefs.startLabel, style = MaterialTheme.typography.titleMedium)
+                    Text(if (active) "Torna al desktop" else prefs.startLabel, style = MaterialTheme.typography.titleMedium)
                 }
                 if (prefs.isGenericDesktop) {
                     Spacer(Modifier.height(12.dp))
@@ -241,6 +259,29 @@ private fun ControlCard(prefs: Prefs) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(16.dp))
+        Text("Tastiera", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(8.dp))
+        val keyboards = listOf(false to "Del telefono", true to "Di questo dispositivo")
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            keyboards.forEachIndexed { i, (value, label) ->
+                SegmentedButton(
+                    selected = prefs.localKeyboard == value,
+                    onClick = { prefs.localKeyboard = value },
+                    shape = SegmentedButtonDefaults.itemShape(i, keyboards.size),
+                ) { Text(label) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (prefs.localKeyboard) {
+                "La tastiera del telefono collegato non compare: scrivi con quella di questo dispositivo dal pulsante Tastiera dei comandi."
+            } else {
+                "Toccando un campo di testo compare la tastiera del telefono collegato, dentro il desktop."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -282,7 +323,7 @@ private fun DesktopPrepButton() {
 @Composable
 private fun ScreenCard(prefs: Prefs) {
     val context = LocalContext.current
-    val auto = remember { DexActivity.autoDpi(context) }
+    val auto = remember { SessionManager.autoDpi(context) }
     val metrics = context.resources.displayMetrics
     val longSide = maxOf(metrics.widthPixels, metrics.heightPixels)
     val shortSide = minOf(metrics.widthPixels, metrics.heightPixels)
@@ -360,6 +401,12 @@ private fun StreamCard(prefs: Prefs) {
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
+        SwitchRow(
+            title = "Connessione diretta",
+            subtitle = "Video su un canale TCP dedicato invece che dentro ADB: molto più fluido. Se la rete lo blocca, Ponte torna da solo ad ADB.",
+            checked = prefs.directChannel,
+            onChange = { prefs.directChannel = it },
+        )
         SwitchRow(
             title = "Audio su questo dispositivo",
             subtitle = "Il suono esce da qui invece che dal telefono",

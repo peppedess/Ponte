@@ -6,11 +6,13 @@ import java.nio.ByteBuffer
 object ControlMessages {
 
     private const val TYPE_INJECT_KEYCODE = 0
+    private const val TYPE_INJECT_TEXT = 1
     private const val TYPE_INJECT_TOUCH_EVENT = 2
     private const val TYPE_INJECT_SCROLL_EVENT = 3
     private const val TYPE_SET_CLIPBOARD = 9
     private const val TYPE_START_APP = 16
     private const val TYPE_RESET_VIDEO = 17
+    private const val TYPE_SCAN_FILE = 22
 
     const val POINTER_ID_MOUSE = -1L
 
@@ -76,6 +78,25 @@ object ControlMessages {
         return ByteBuffer.allocate(2 + raw.size)
             .put(TYPE_START_APP.toByte())
             .put(raw.size.toByte())
+            .put(raw)
+            .array()
+    }
+
+    /** Testo da digitare (solo ASCII: il server lo converte in tasti). Max 300 byte. */
+    fun injectText(text: String): ByteArray {
+        val raw = text.toByteArray(Charsets.UTF_8).let { if (it.size > 300) it.copyOf(300) else it }
+        return ByteBuffer.allocate(5 + raw.size)
+            .put(TYPE_INJECT_TEXT.toByte())
+            .putInt(raw.size)
+            .put(raw)
+            .array()
+    }
+
+    fun scanFile(path: String): ByteArray {
+        val raw = path.toByteArray(Charsets.UTF_8)
+        return ByteBuffer.allocate(5 + raw.size)
+            .put(TYPE_SCAN_FILE.toByte())
+            .putInt(raw.size)
             .put(raw)
             .array()
     }

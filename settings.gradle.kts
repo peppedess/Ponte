@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Ponte"
 include(":app")
+include(":relay")

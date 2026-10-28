@@ -138,6 +138,10 @@ class Prefs private constructor(context: Context) {
     var keepActive by boolPref("keep_active", true)
     /** Lo schermo funziona come il trackpad di un portatile invece che come touchscreen. */
     var touchpad by boolPref("touchpad", false)
+    /** Video su connessione TCP diretta invece che dentro ADB (molto più fluido). */
+    var directChannel by boolPref("direct", true)
+    /** Scrivere con la tastiera di questo dispositivo invece di quella del telefono collegato. */
+    var localKeyboard by boolPref("local_keyboard", false)
 
     val isPaired: Boolean get() = current != null
 

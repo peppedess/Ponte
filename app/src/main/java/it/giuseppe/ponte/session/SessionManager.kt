@@ -182,9 +182,22 @@ object SessionManager {
         return metrics.widthPixels to metrics.heightPixels
     }
 
-    /** Densità predefinita: circa il 60% di quella del dispositivo, a multipli di 10. */
+    /** Altezza minima del desktop: sotto questa soglia pannelli come il cassetto delle app di DeX escono dallo schermo. */
+    const val MIN_DESKTOP_HEIGHT_DP = 780
+
+    /** Densità più alta che lascia al desktop almeno [MIN_DESKTOP_HEIGHT_DP] di altezza. */
+    fun maxDpiForHeight(context: Context): Int {
+        val (w, h) = screenSize(context)
+        return (minOf(w, h) * 160 / MIN_DESKTOP_HEIGHT_DP / 10) * 10
+    }
+
+    /**
+     * Densità predefinita: circa il 60% di quella del dispositivo, ma mai così alta da rendere il
+     * desktop più basso di [MIN_DESKTOP_HEIGHT_DP]. A multipli di 10.
+     */
     fun autoDpi(context: Context): Int {
         val device = context.resources.displayMetrics.densityDpi
-        return ((device * 0.6f / 10f).roundToInt() * 10).coerceIn(120, 360)
+        val comfortable = (device * 0.6f / 10f).roundToInt() * 10
+        return minOf(comfortable, maxDpiForHeight(context)).coerceIn(120, 360)
     }
 }

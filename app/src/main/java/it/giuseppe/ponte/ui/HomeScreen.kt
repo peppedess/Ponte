@@ -347,9 +347,9 @@ private fun DesktopPrepButton() {
 private fun ScreenCard(prefs: Prefs) {
     val context = LocalContext.current
     val auto = remember { SessionManager.autoDpi(context) }
-    val metrics = context.resources.displayMetrics
-    val longSide = maxOf(metrics.widthPixels, metrics.heightPixels)
-    val shortSide = minOf(metrics.widthPixels, metrics.heightPixels)
+    val (screenW, screenH) = remember { SessionManager.screenSize(context) }
+    val longSide = maxOf(screenW, screenH)
+    val shortSide = minOf(screenW, screenH)
     val dpi = if (prefs.dpi > 0) prefs.dpi else auto
 
     SectionCard(Icons.Rounded.Tune, "Schermo") {
@@ -360,6 +360,16 @@ private fun ScreenCard(prefs: Prefs) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (shortSide * 160 / dpi < SessionManager.MIN_DESKTOP_HEIGHT_DP) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Con questa densità il desktop è alto meno di ${SessionManager.MIN_DESKTOP_HEIGHT_DP} dp: alcuni pannelli " +
+                    "di DeX, come il cassetto delle app, possono uscire dallo schermo. Consigliato: al massimo " +
+                    "${SessionManager.maxDpiForHeight(context)} dpi.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Spacer(Modifier.height(12.dp))
         DesktopPreview(longSide, shortSide, dpi)
         Spacer(Modifier.height(4.dp))

@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches-ignore:
+      - rapporto
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,28 @@ jobs:
       - name: Errori
         if: failure()
         run: |
-          grep -E "^e: |What went wrong|Could not" -A3 build.log || tail -n 60 build.log
+          grep -E "^e: |What went wrong|Could not|error:|FAILED" -A3 build.log > errori.txt || tail -n 80 build.log > errori.txt
+          cat errori.txt
+          # Anche come annotazione, leggibile dall'API senza scaricare i log
+          msg=$(head -n 80 errori.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Errori di compilazione::$msg"
+
+      # Il registro di compilazione completo sul ramo "rapporto" (anche quando la build riesce)
+      - name: Pubblica il rapporto
+        if: always()
+        run: |
+          mkdir -p rapporto
+          if [ -f build.log ]; then cp build.log rapporto/build.log; fi
+          if [ -f errori.txt ]; then cp errori.txt rapporto/errori.txt; fi
+          if [ -f test.log ]; then cp test.log rapporto/test.log; fi
+          if [ -d app/build/outputs/roborazzi ]; then cp -r app/build/outputs/roborazzi rapporto/screenshot; fi
+          if [ -d app/build/test-results ]; then cp -r app/build/test-results rapporto/risultati-test; fi
+          cd rapporto
+          git init -q
+          git checkout -q -b rapporto
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898299+github-actions[bot]@users.noreply.github.com" commit -q -m "Rapporto ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" rapporto
 
       - name: Prepara l'APK
         run: |

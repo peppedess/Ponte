@@ -70,7 +70,12 @@ object SessionManager {
                 "Connessione al telefono…"
             },
         )
-        ContextCompat.startForegroundService(app, Intent(app, SessionService::class.java))
+        if (!SessionService.running) {
+            // Durante una riconnessione l'app può essere in sottofondo: lì Android non permette di
+            // avviare servizi in primo piano, ma il servizio è già attivo dalla prima connessione.
+            runCatching { ContextCompat.startForegroundService(app, Intent(app, SessionService::class.java)) }
+                .onFailure { Diag.w(TAG, "Servizio in primo piano non avviato", it) }
+        }
 
         startJob = scope.launch {
             try {

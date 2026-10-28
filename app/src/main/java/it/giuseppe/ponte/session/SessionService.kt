@@ -35,6 +35,7 @@ class SessionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running = true
         createChannel()
         acquireWifiLock()
         scope.launch {
@@ -64,6 +65,7 @@ class SessionService : Service() {
     }
 
     override fun onDestroy() {
+        running = false
         scope.cancel()
         runCatching { wifiLock?.release() }
         super.onDestroy()
@@ -126,6 +128,11 @@ class SessionService : Service() {
     private fun notificationManager() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     companion object {
+        /** Il servizio è già attivo: non va riavviato (da sottofondo Android lo vieterebbe). */
+        @Volatile
+        var running = false
+            private set
+
         private const val CHANNEL_ID = "sessione"
         private const val NOTIFICATION_ID = 7
         private const val ACTION_STOP = "it.giuseppe.ponte.STOP"

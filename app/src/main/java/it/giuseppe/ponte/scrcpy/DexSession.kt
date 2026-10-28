@@ -117,6 +117,15 @@ class DexSession(
     private var sessionHeight = 0
 
     private var audioTrack: AudioTrack? = null
+    private var audioDecoder: MediaCodec? = null
+    @Volatile private var lowLatencyForced = false
+
+    /** Statistiche della trasmissione, aggiornate ogni secondo: "60 fps · 7,8 Mbit/s" */
+    private val _stats = MutableStateFlow("")
+    val stats: StateFlow<String> = _stats.asStateFlow()
+    private var statsFrames = 0
+    private var statsBytes = 0L
+    private var statsSince = System.nanoTime()
 
     fun start() {
         Thread({ run() }, "ponte-session").start()
@@ -127,6 +136,10 @@ class DexSession(
             _state.value = SessionState.Starting("Invio del server al telefono…")
             val server = context.assets.open("scrcpy-server.jar").use { it.readBytes() }
             AdbSync.push(adb, server, REMOTE_PATH)
+
+            // Wi-Fi del telefono in modalità bassa latenza (niente risparmio energetico tra i pacchetti)
+            runCatching { adb.shell("cmd wifi force-low-latency-mode enabled") }
+            lowLatencyForced = true
 
             _state.value = SessionState.Starting("Avvio del desktop sul telefono…")
             val scid = Random.nextInt(0, Int.MAX_VALUE)
@@ -148,7 +161,9 @@ class DexSession(
                 add("power_off_on_close=false")
                 add("clipboard_autosync=true")
                 if (config.audio) {
-                    add("audio_codec=raw")
+                    // AAC a 128 kbit/s invece di PCM grezzo (1,5 Mbit/s): lascia la banda al video
+                    add("audio_codec=aac")
+                    add("audio_bit_rate=128000")
                 }
             }.joinToString(" ")
             val command = "CLASSPATH=$REMOTE_PATH app_process / com.genymobile.scrcpy.Server $SERVER_VERSION $args"
@@ -244,6 +259,22 @@ class DexSession(
             val isKey = ptsFlags and FLAG_KEY_FRAME != 0L
             val pts = ptsFlags and PTS_MASK
             onVideoPacket(data, isConfig, isKey, pts)
+            updateStats(size)
+        }
+    }
+
+    private fun updateStats(size: Int) {
+        statsFrames++
+        statsBytes += size
+        val now = System.nanoTime()
+        val elapsed = now - statsSince
+        if (elapsed >= 1_000_000_000L) {
+            val fps = statsFrames * 1_000_000_000L / elapsed
+            val mbps = statsBytes * 8.0 * 1_000.0 / elapsed
+            _stats.value = "%d fps · %.1f Mbit/s".format(fps, mbps)
+            statsFrames = 0
+            statsBytes = 0
+            statsSince = now
         }
     }
 
@@ -374,43 +405,88 @@ class DexSession(
                 Log.w(TAG, "Audio non disponibile sul telefono ($codecId)")
                 return
             }
-            val minBuffer = AudioTrack.getMinBufferSize(
-                48_000, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT,
-            )
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build(),
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setSampleRate(48_000)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build(),
-                )
-                .setBufferSizeInBytes(maxOf(minBuffer * 2, 48_000 * 4 / 10))
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-                .build()
+            val track = createAudioTrack()
             audioTrack = track
             track.play()
+            val isAac = codecId == CODEC_AAC
             val header = ByteArray(12)
             var data = ByteArray(16 * 1024)
+            val info = MediaCodec.BufferInfo()
+            var pcm = ByteArray(8 * 1024)
             while (!closed) {
                 input.readFully(header)
                 val ptsFlags = ByteBuffer.wrap(header).getLong(0)
                 val size = ByteBuffer.wrap(header).getInt(8)
                 if (size > data.size) data = ByteArray(size)
                 input.readFully(data, 0, size)
-                if (ptsFlags and FLAG_CONFIG != 0L) continue
-                track.write(data, 0, size)
+                val isConfig = ptsFlags and FLAG_CONFIG != 0L
+
+                if (!isAac) {
+                    if (!isConfig) track.write(data, 0, size)
+                    continue
+                }
+
+                if (isConfig) {
+                    // AudioSpecificConfig: crea il decoder AAC
+                    audioDecoder?.let { runCatching { it.stop(); it.release() } }
+                    val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48_000, 2).apply {
+                        setByteBuffer("csd-0", ByteBuffer.wrap(data.copyOf(size)))
+                        setInteger(MediaFormat.KEY_IS_ADTS, 0)
+                    }
+                    audioDecoder = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC).apply {
+                        configure(format, null, null, 0)
+                        start()
+                    }
+                    continue
+                }
+                val codec = audioDecoder ?: continue
+                val inIndex = codec.dequeueInputBuffer(20_000)
+                if (inIndex >= 0) {
+                    val buffer = codec.getInputBuffer(inIndex)!!
+                    buffer.clear()
+                    buffer.put(data, 0, size)
+                    codec.queueInputBuffer(inIndex, 0, size, ptsFlags and PTS_MASK, 0)
+                }
+                while (true) {
+                    val outIndex = codec.dequeueOutputBuffer(info, 0)
+                    if (outIndex < 0) break
+                    val out = codec.getOutputBuffer(outIndex)
+                    if (out != null && info.size > 0) {
+                        if (info.size > pcm.size) pcm = ByteArray(info.size)
+                        out.position(info.offset)
+                        out.get(pcm, 0, info.size)
+                        track.write(pcm, 0, info.size)
+                    }
+                    codec.releaseOutputBuffer(outIndex, false)
+                }
             }
         } catch (e: Exception) {
             if (!closed) Log.w(TAG, "Audio interrotto", e)
         }
+    }
+
+    private fun createAudioTrack(): AudioTrack {
+        val minBuffer = AudioTrack.getMinBufferSize(
+            48_000, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT,
+        )
+        return AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setSampleRate(48_000)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .build(),
+            )
+            .setBufferSizeInBytes(maxOf(minBuffer * 2, 48_000 * 4 / 10))
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            .build()
     }
 
     // ---- Controllo ----
@@ -484,9 +560,14 @@ class DexSession(
             runCatching { stream?.close() }
         }
         synchronized(surfaceLock) { releaseDecoder() }
+        audioDecoder?.let { runCatching { it.stop(); it.release() } }
         runCatching { audioTrack?.stop() }
         runCatching { audioTrack?.release() }
         controlExecutor.shutdownNow()
+        if (lowLatencyForced) {
+            lowLatencyForced = false
+            Thread { runCatching { adb.shell("cmd wifi force-low-latency-mode disabled") } }.start()
+        }
     }
 
     private fun describe(e: Throwable): String {
@@ -504,6 +585,7 @@ class DexSession(
         const val SERVER_VERSION = "5.0.1"
         private const val REMOTE_PATH = "/data/local/tmp/ponte-scrcpy-server-$SERVER_VERSION.jar"
         private const val LIST_PATH = "/data/local/tmp/ponte-scrcpy-list-$SERVER_VERSION.jar"
+        private const val CODEC_AAC = 0x00616163
         private const val FLAG_CONFIG = 1L shl 62
         private const val FLAG_KEY_FRAME = 1L shl 61
         private const val PTS_MASK = FLAG_KEY_FRAME - 1

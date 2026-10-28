@@ -41,13 +41,15 @@ object GalaxyLink {
         val adb = PonteAdb.get(context)
         val prefs = Prefs.get(context)
 
-        if (adb.isConnected && runCatching { adb.shell("echo ok") == "ok" }.getOrDefault(false)) {
+        if (adb.isConnected && isAlive(adb)) {
             return@withContext readInfo(adb, prefs)
         }
         adb.disconnectQuietly()
 
         var lastError: Throwable? = null
-        if (prefs.lastHost.isNotEmpty() && prefs.lastPort > 0) {
+        // Prima verifica veloce che la porta risponda: altrimenti il timeout TCP di sistema
+        // (anche un minuto) bloccherebbe la schermata su "Connessione al telefono…"
+        if (prefs.lastHost.isNotEmpty() && prefs.lastPort > 0 && isReachable(prefs.lastHost, prefs.lastPort)) {
             try {
                 if (adb.connect(prefs.lastHost, prefs.lastPort)) return@withContext readInfo(adb, prefs)
             } catch (e: AdbPairingRequiredException) {
@@ -70,6 +72,9 @@ object GalaxyLink {
             lastError,
         )
 
+        if (!isReachable(service.host, service.port, 3_000)) {
+            throw LinkException("Il telefono è stato trovato ma non risponde: controlla che sia sbloccato e sulla stessa rete Wi-Fi.")
+        }
         try {
             if (!adb.connect(service.host, service.port) && !adb.isConnected) {
                 throw LinkException("Il telefono ha rifiutato la connessione.")
@@ -86,6 +91,24 @@ object GalaxyLink {
         prefs.lastPort = service.port
         readInfo(adb, prefs)
     }
+
+    /** La connessione esistente risponde ancora? Con un timeout: se il Wi-Fi è caduto, aprire un flusso resta appeso. */
+    private fun isAlive(adb: PonteAdb): Boolean {
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        return try {
+            executor.submit<Boolean> { adb.shell("echo ok") == "ok" }.get(3, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: Exception) {
+            false
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun isReachable(host: String, port: Int, timeoutMs: Int = 1_500): Boolean =
+        runCatching {
+            java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, port), timeoutMs) }
+            true
+        }.getOrDefault(false)
 
     private fun readInfo(adb: PonteAdb, prefs: Prefs): DeviceInfo {
         val props = adb.shell(

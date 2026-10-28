@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.view.KeyEvent
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SpaceDashboard
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -89,11 +91,14 @@ class DexActivity : ComponentActivity() {
     private var forwarder: InputForwarder? = null
     private var lastSyncedClipboard: String? = null
     private var showApps by mutableStateOf(false)
+    private var showStats by mutableStateOf(false)
+    private var wifiLock: WifiManager.WifiLock? = null
     private val appsOfferedFor = mutableSetOf<DexSession>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        acquireWifiLock()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
@@ -197,7 +202,23 @@ class DexActivity : ComponentActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    /** Wi-Fi sempre attivo e a bassa latenza mentre si guarda il desktop: evita gli scatti del risparmio energetico. */
+    @Suppress("DEPRECATION")
+    private fun acquireWifiLock() {
+        val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+        } else {
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+        }
+        wifiLock = wifi.createWifiLock(mode, "ponte").apply {
+            setReferenceCounted(false)
+            runCatching { acquire() }
+        }
+    }
+
     override fun onDestroy() {
+        runCatching { wifiLock?.release() }
         if (isFinishing) session?.close()
         super.onDestroy()
     }
@@ -235,6 +256,19 @@ class DexActivity : ComponentActivity() {
 
             if (state is SessionState.Running) {
                 ControlHandle(Modifier.align(Alignment.TopCenter))
+                if (showStats && current != null) {
+                    val stats by current.stats.collectAsState()
+                    Text(
+                        stats.ifEmpty { "…" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
                 if (current != null) {
                     // Fuori da Samsung il display virtuale può essere vuoto: propone subito le app
                     LaunchedEffect(current) {
@@ -375,6 +409,9 @@ class DexActivity : ComponentActivity() {
                             }
                             FilledTonalIconButton(onClick = { forwarder?.pressKey(KeyEvent.KEYCODE_APP_SWITCH) }) {
                                 Icon(Icons.Rounded.SpaceDashboard, contentDescription = "App recenti")
+                            }
+                            FilledTonalIconButton(onClick = { showStats = !showStats }) {
+                                Icon(Icons.Rounded.Speed, contentDescription = "Statistiche")
                             }
                             FilledTonalIconButton(onClick = { showApps = true }) {
                                 Icon(Icons.Rounded.Apps, contentDescription = "App")

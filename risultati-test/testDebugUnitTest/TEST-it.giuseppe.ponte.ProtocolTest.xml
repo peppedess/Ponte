@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="it.giuseppe.ponte.ProtocolTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-28T15:58:54.604Z" hostname="runnervmnwato" time="0.046">
+  <properties/>
+  <testcase name="resetVideo" classname="it.giuseppe.ponte.ProtocolTest" time="0.005"/>
+  <testcase name="scroll" classname="it.giuseppe.ponte.ProtocolTest" time="0.002"/>
+  <testcase name="scanFile" classname="it.giuseppe.ponte.ProtocolTest" time="0.01"/>
+  <testcase name="keycode" classname="it.giuseppe.ponte.ProtocolTest" time="0.0"/>
+  <testcase name="appList" classname="it.giuseppe.ponte.ProtocolTest" time="0.021"/>
+  <testcase name="sessionPacket" classname="it.giuseppe.ponte.ProtocolTest" time="0.001"/>
+  <testcase name="injectTextIsTruncatedTo300Bytes" classname="it.giuseppe.ponte.ProtocolTest" time="0.0"/>
+  <testcase name="setClipboard" classname="it.giuseppe.ponte.ProtocolTest" time="0.001"/>
+  <testcase name="touch" classname="it.giuseppe.ponte.ProtocolTest" time="0.0"/>
+  <testcase name="mousePointerIdIsAllOnes" classname="it.giuseppe.ponte.ProtocolTest" time="0.002"/>
+  <testcase name="startApp" classname="it.giuseppe.ponte.ProtocolTest" time="0.001"/>
+  <testcase name="mediaPacketWithFlags" classname="it.giuseppe.ponte.ProtocolTest" time="0.0"/>
+  <testcase name="injectText" classname="it.giuseppe.ponte.ProtocolTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

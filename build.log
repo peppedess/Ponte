@@ -1,0 +1,112 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libconscrypt_jni.so, libspake2.so. Run with --info option to learn more.
+
+> Task :app:checkReleaseAarMetadata
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:processReleaseNavigationResources
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:compileReleaseNavigationResources
+> Task :app:generateReleaseResValues
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage
+> Task :app:javaPreCompileRelease
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :relay:preBuild UP-TO-DATE
+> Task :relay:preReleaseBuild UP-TO-DATE
+> Task :relay:mergeReleaseJniLibFolders
+> Task :relay:mergeReleaseNativeLibs NO-SOURCE
+> Task :relay:stripReleaseDebugSymbols NO-SOURCE
+> Task :relay:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :relay:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :relay:checkReleaseDuplicateClasses
+> Task :relay:javaPreCompileRelease
+> Task :relay:checkReleaseAarMetadata
+> Task :relay:processReleaseNavigationResources
+> Task :relay:compileReleaseNavigationResources
+> Task :relay:generateReleaseResValues
+> Task :relay:mapReleaseSourceSetPaths
+> Task :relay:generateReleaseResources
+> Task :relay:mergeReleaseResources
+> Task :relay:packageReleaseResources
+> Task :relay:createReleaseCompatibleScreenManifests
+> Task :relay:parseReleaseLocalResources
+> Task :relay:extractDeepLinksRelease
+> Task :relay:processReleaseMainManifest
+> Task :relay:processReleaseManifest
+> Task :relay:processReleaseManifestForPackage
+> Task :relay:desugarReleaseFileDependencies
+> Task :app:processReleaseResources
+> Task :relay:mergeReleaseStartupProfile
+> Task :relay:processReleaseResources
+> Task :relay:compileReleaseJavaWithJavac
+> Task :relay:dexBuilderRelease
+> Task :relay:mergeExtDexRelease
+> Task :relay:mergeReleaseArtProfile
+> Task :relay:mergeDexRelease
+> Task :relay:mergeReleaseGlobalSynthetics
+> Task :relay:mergeReleaseShaders
+> Task :relay:compileReleaseArtProfile
+> Task :relay:compileReleaseShaders NO-SOURCE
+> Task :relay:generateReleaseAssets UP-TO-DATE
+> Task :relay:mergeReleaseAssets
+> Task :relay:compressReleaseAssets
+> Task :relay:extractReleaseVersionControlInfo
+> Task :relay:processReleaseJavaRes NO-SOURCE
+> Task :relay:mergeReleaseJavaResource
+> Task :relay:collectReleaseDependencies
+> Task :relay:sdkReleaseDependencyData
+> Task :relay:writeReleaseAppMetadata
+> Task :relay:writeReleaseSigningConfigVersions
+> Task :relay:optimizeReleaseResources
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo
+> Task :relay:packageRelease
+> Task :relay:createReleaseApkListingFileRedirect
+> Task :relay:assembleRelease
+> Task :app:copyRelay
+> Task :app:mergeReleaseAssets
+> Task :app:optimizeReleaseResources
+> Task :app:compressReleaseAssets
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:mergeExtDexRelease
+> Task :app:compileReleaseKotlin
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1793203044976.json
+
+BUILD SUCCESSFUL in 56s
+85 actionable tasks: 85 executed

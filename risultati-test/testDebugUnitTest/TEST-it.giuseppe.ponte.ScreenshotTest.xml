@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="it.giuseppe.ponte.ScreenshotTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-28T15:58:54.818Z" hostname="runnervmnwato" time="11.903">
+  <properties/>
+  <testcase name="onboardingWelcome" classname="it.giuseppe.ponte.ScreenshotTest" time="10.539"/>
+  <testcase name="home" classname="it.giuseppe.ponte.ScreenshotTest" time="0.817"/>
+  <testcase name="homeTablet" classname="it.giuseppe.ponte.ScreenshotTest" time="0.547"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

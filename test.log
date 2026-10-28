@@ -1,0 +1,119 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkDebugAarMetadata
+> Task :app:processDebugNavigationResources
+> Task :app:generateDebugResValues
+> Task :app:compileDebugNavigationResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :relay:preBuild UP-TO-DATE
+> Task :relay:preReleaseBuild UP-TO-DATE
+> Task :relay:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :relay:mergeReleaseNativeLibs NO-SOURCE
+> Task :relay:stripReleaseDebugSymbols NO-SOURCE
+> Task :relay:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :relay:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :relay:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :relay:javaPreCompileRelease UP-TO-DATE
+> Task :relay:checkReleaseAarMetadata UP-TO-DATE
+> Task :relay:processReleaseNavigationResources UP-TO-DATE
+> Task :relay:compileReleaseNavigationResources UP-TO-DATE
+> Task :relay:generateReleaseResValues UP-TO-DATE
+> Task :relay:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :relay:generateReleaseResources UP-TO-DATE
+> Task :relay:mergeReleaseResources UP-TO-DATE
+> Task :relay:packageReleaseResources UP-TO-DATE
+> Task :relay:parseReleaseLocalResources UP-TO-DATE
+> Task :relay:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :relay:extractDeepLinksRelease UP-TO-DATE
+> Task :relay:processReleaseMainManifest UP-TO-DATE
+> Task :relay:processReleaseManifest UP-TO-DATE
+> Task :relay:processReleaseManifestForPackage UP-TO-DATE
+> Task :relay:processReleaseResources UP-TO-DATE
+> Task :relay:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :relay:dexBuilderRelease UP-TO-DATE
+> Task :relay:desugarReleaseFileDependencies UP-TO-DATE
+> Task :relay:mergeReleaseStartupProfile UP-TO-DATE
+> Task :relay:mergeExtDexRelease UP-TO-DATE
+> Task :relay:mergeDexRelease UP-TO-DATE
+> Task :relay:mergeReleaseArtProfile UP-TO-DATE
+> Task :relay:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :relay:compileReleaseArtProfile UP-TO-DATE
+> Task :relay:mergeReleaseShaders UP-TO-DATE
+> Task :relay:compileReleaseShaders NO-SOURCE
+> Task :relay:generateReleaseAssets UP-TO-DATE
+> Task :relay:mergeReleaseAssets UP-TO-DATE
+> Task :relay:compressReleaseAssets UP-TO-DATE
+> Task :relay:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :relay:processReleaseJavaRes NO-SOURCE
+> Task :relay:mergeReleaseJavaResource UP-TO-DATE
+> Task :relay:optimizeReleaseResources UP-TO-DATE
+> Task :relay:collectReleaseDependencies UP-TO-DATE
+> Task :relay:sdkReleaseDependencyData UP-TO-DATE
+> Task :relay:writeReleaseAppMetadata UP-TO-DATE
+> Task :relay:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :relay:packageRelease UP-TO-DATE
+> Task :relay:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :relay:assembleRelease UP-TO-DATE
+> Task :app:copyRelay UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:processDebugResources
+> Task :app:processDebugUnitTestManifest
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :relay:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugUnitTestConfig
+> Task :relay:javaPreCompileDebug
+> Task :relay:checkDebugAarMetadata
+> Task :relay:processDebugNavigationResources
+> Task :relay:compileDebugNavigationResources
+> Task :relay:generateDebugResValues
+> Task :relay:mapDebugSourceSetPaths
+> Task :relay:generateDebugResources
+> Task :relay:mergeDebugResources
+> Task :relay:packageDebugResources
+> Task :relay:createDebugCompatibleScreenManifests
+> Task :relay:extractDeepLinksDebug
+> Task :relay:parseDebugLocalResources
+> Task :relay:processDebugMainManifest
+> Task :relay:processDebugManifest
+> Task :relay:preDebugUnitTestBuild UP-TO-DATE
+> Task :relay:processDebugJavaRes NO-SOURCE
+> Task :relay:javaPreCompileDebugUnitTest
+> Task :relay:processDebugUnitTestJavaRes NO-SOURCE
+> Task :relay:processDebugManifestForPackage
+> Task :relay:processDebugResources
+> Task :relay:compileDebugJavaWithJavac
+> Task :relay:bundleDebugClassesToCompileJar
+> Task :relay:bundleDebugClassesToRuntimeJar
+> Task :relay:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :relay:testDebugUnitTest NO-SOURCE
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:processDebugJavaRes
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_3-1793203100738.json
+
+BUILD SUCCESSFUL in 50s
+89 actionable tasks: 49 executed, 40 up-to-date

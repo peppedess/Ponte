@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     ) { mode ->
                         if (mode == null) {
                             HomeScreen(
-                                onStart = { startActivity(Intent(this, DexActivity::class.java)) },
+                                onStart = { startActivity(Intent(this@MainActivity, DexActivity::class.java)) },
                                 onAddDevice = { onboarding = !prefs.isPaired },
                             )
                         } else {

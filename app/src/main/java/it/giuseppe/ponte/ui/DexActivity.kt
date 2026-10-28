@@ -93,7 +93,6 @@ class DexActivity : ComponentActivity() {
     private var showApps by mutableStateOf(false)
     private var showStats by mutableStateOf(false)
     private var wifiLock: WifiManager.WifiLock? = null
-    private val appsOfferedFor = mutableSetOf<DexSession>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -270,14 +269,6 @@ class DexActivity : ComponentActivity() {
                     )
                 }
                 if (current != null) {
-                    // Fuori da Samsung il display virtuale può essere vuoto: propone subito le app
-                    LaunchedEffect(current) {
-                        if (Prefs.get(this@DexActivity).isGenericDesktop && !appsOfferedFor.contains(current)) {
-                            appsOfferedFor.add(current)
-                            delay(1_500)
-                            showApps = true
-                        }
-                    }
                     if (showApps) {
                         AppsSheet(current, onDismiss = { showApps = false })
                     }

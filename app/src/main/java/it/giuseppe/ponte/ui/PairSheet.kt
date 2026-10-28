@@ -106,13 +106,23 @@ fun PairSheet(onDismiss: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     Text("${done.name} associato", style = MaterialTheme.typography.headlineSmall)
                     Text(done.details, style = MaterialTheme.typography.bodyMedium)
-                    if (done.oneUi in 1..79_999) {
+                    if (done.isSamsung && done.oneUi in 1..79_999) {
                         Spacer(Modifier.height(12.dp))
                         Text(
                             "Attenzione: DeX su display virtuale richiede One UI 8 o successiva. " +
                                 "Con questa versione vedrai il normale schermo Android invece di DeX.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    if (!done.isSamsung) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Non è un Samsung: al posto di DeX vedrai la modalità desktop di Android, se il telefono " +
+                                "la supporta. Dalla schermata principale puoi attivarla con \"Prepara la modalità desktop\".",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                         )
                     }
@@ -124,10 +134,10 @@ fun PairSheet(onDismiss: () -> Unit) {
                 return@Column
             }
 
-            Text("Associa il Galaxy", style = MaterialTheme.typography.headlineSmall)
+            Text("Associa il telefono", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Sul Galaxy apri Opzioni sviluppatore → Debug wireless → " +
+                "Sul telefono da usare (es. il Galaxy) apri Opzioni sviluppatore → Debug wireless → " +
                     "Associa dispositivo con codice di associazione. Lascia aperta quella schermata.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -167,7 +177,7 @@ fun PairSheet(onDismiss: () -> Unit) {
                         ) {
                             LoadingIndicator(Modifier.size(40.dp))
                             Spacer(Modifier.width(12.dp))
-                            Text("Cerco il Galaxy sulla rete…", style = MaterialTheme.typography.bodyLarge)
+                            Text("Cerco il telefono sulla rete…", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 } else {

@@ -9,6 +9,7 @@ object ControlMessages {
     private const val TYPE_INJECT_TOUCH_EVENT = 2
     private const val TYPE_INJECT_SCROLL_EVENT = 3
     private const val TYPE_SET_CLIPBOARD = 9
+    private const val TYPE_START_APP = 16
     private const val TYPE_RESET_VIDEO = 17
 
     const val POINTER_ID_MOUSE = -1L
@@ -65,6 +66,16 @@ object ControlMessages {
             .putLong(sequence)
             .put(if (paste) 1 else 0)
             .putInt(raw.size)
+            .put(raw)
+            .array()
+    }
+
+    /** Avvia un'app sul display virtuale; "+" davanti al pacchetto la chiude prima di riaprirla. */
+    fun startApp(packageName: String): ByteArray {
+        val raw = packageName.toByteArray(Charsets.UTF_8).let { if (it.size > 255) it.copyOf(255) else it }
+        return ByteBuffer.allocate(2 + raw.size)
+            .put(TYPE_START_APP.toByte())
+            .put(raw.size.toByte())
             .put(raw)
             .array()
     }

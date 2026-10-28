@@ -32,6 +32,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -47,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import it.giuseppe.ponte.Codec
 import it.giuseppe.ponte.Prefs
 import it.giuseppe.ponte.Resolution
+import it.giuseppe.ponte.adb.GalaxyLink
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -133,7 +137,7 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (prefs.isPaired) prefs.deviceName.ifEmpty { "Galaxy associato" } else "Nessun Galaxy associato",
+                        if (prefs.isPaired) prefs.deviceName.ifEmpty { "Telefono associato" } else "Nessun telefono associato",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -156,7 +160,11 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 ) {
                     Icon(Icons.Rounded.DesktopWindows, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Avvia DeX", style = MaterialTheme.typography.titleMedium)
+                    Text(prefs.startLabel, style = MaterialTheme.typography.titleMedium)
+                }
+                if (prefs.isGenericDesktop) {
+                    Spacer(Modifier.height(12.dp))
+                    DesktopPrepButton()
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -173,10 +181,45 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 ) {
                     Icon(Icons.Rounded.Link, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Associa il Galaxy", style = MaterialTheme.typography.titleMedium)
+                    Text("Associa il telefono", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
+    }
+}
+
+/** Sui telefoni non Samsung: attiva finestre libere e desktop sui display secondari (poi va riavviato). */
+@Composable
+private fun DesktopPrepButton() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    OutlinedButton(
+        onClick = {
+            busy = true
+            message = null
+            scope.launch {
+                message = try {
+                    GalaxyLink.prepareDesktopMode(context)
+                    "Fatto. Riavvia il telefono una volta perché la modalità desktop si attivi."
+                } catch (e: Exception) {
+                    e.message ?: "Non è stato possibile cambiare le impostazioni."
+                } finally {
+                    busy = false
+                }
+            }
+        },
+        enabled = !busy,
+        shapes = ButtonDefaults.shapes(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(Icons.Rounded.Tune, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(if (busy) "Attendi…" else "Prepara la modalità desktop")
+    }
+    message?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -263,13 +306,13 @@ private fun StreamCard(prefs: Prefs) {
         HorizontalDivider()
         SwitchRow(
             title = "Audio su questo dispositivo",
-            subtitle = "Il suono di DeX esce da qui invece che dal Galaxy",
+            subtitle = "Il suono esce da qui invece che dal telefono",
             checked = prefs.audio,
             onChange = { prefs.audio = it },
         )
         SwitchRow(
-            title = "Tieni sveglio il Galaxy",
-            subtitle = "Evita che DeX si metta in pausa quando il Galaxy va in standby",
+            title = "Tieni sveglio il telefono",
+            subtitle = "Evita che il desktop si metta in pausa quando il telefono va in standby",
             checked = prefs.keepActive,
             onChange = { prefs.keepActive = it },
         )
@@ -280,9 +323,9 @@ private fun StreamCard(prefs: Prefs) {
 private fun GuideCard() {
     SectionCard(Icons.Rounded.Wifi, "Prima di iniziare") {
         val steps = listOf(
-            "Sul Galaxy serve One UI 8 o successiva: DeX parte da solo sul display virtuale.",
-            "Galaxy e questo dispositivo devono essere sulla stessa rete Wi-Fi.",
-            "Sul Galaxy: Impostazioni → Opzioni sviluppatore → Debug wireless attivo.",
+            "Galaxy con One UI 8 o successiva: DeX parte da solo. Altri telefoni: compare la modalità desktop di Android, se disponibile, oppure apri le app dalla linguetta in alto.",
+            "I due dispositivi devono essere sulla stessa rete Wi-Fi.",
+            "Sul telefono da usare: Impostazioni → Opzioni sviluppatore → Debug wireless attivo.",
             "Per l'associazione: Debug wireless → Associa dispositivo con codice, poi inserisci il codice qui.",
             "Utile: aggiungi il riquadro rapido \"Debug wireless\" dalle Opzioni sviluppatore.",
         )

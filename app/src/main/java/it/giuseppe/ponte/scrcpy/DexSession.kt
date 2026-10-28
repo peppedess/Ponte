@@ -38,6 +38,37 @@ data class SessionConfig(
     val keepActive: Boolean,
 )
 
+data class RemoteApp(val name: String, val packageName: String, val system: Boolean)
+
+/** Interpreta l'elenco stampato da scrcpy-server con list_apps=true. */
+fun parseAppList(output: String): List<RemoteApp> {
+    val apps = mutableListOf<RemoteApp>()
+    var pending: Pair<String, Boolean>? = null
+    val entry = Regex("""^\s?([*-]) (.*?\S)\s{2,}(\S+)$""")
+    val start = Regex("""^\s?([*-]) (.*\S)$""")
+    val pkgOnly = Regex("""^\s{3,}(\S+)$""")
+    for (raw in output.lines()) {
+        val line = raw.trimEnd().removePrefix("[server] INFO: ")
+        val waiting = pending
+        if (waiting != null) {
+            pkgOnly.find(line)?.let { m ->
+                apps += RemoteApp(waiting.first, m.groupValues[1], waiting.second)
+            }
+            pending = null
+            continue
+        }
+        val e = entry.find(line)
+        if (e != null && e.groupValues[3].contains('.')) {
+            apps += RemoteApp(e.groupValues[2], e.groupValues[3], e.groupValues[1] == "*")
+            continue
+        }
+        start.find(line)?.let { m -> pending = m.groupValues[2] to (m.groupValues[1] == "*") }
+    }
+    return apps
+        .distinctBy { it.packageName }
+        .sortedWith(compareBy<RemoteApp> { it.system }.thenBy { it.name.lowercase() })
+}
+
 sealed interface SessionState {
     data class Starting(val step: String) : SessionState
     data class Running(val deviceName: String) : SessionState
@@ -93,11 +124,11 @@ class DexSession(
 
     private fun run() {
         try {
-            _state.value = SessionState.Starting("Invio del server al Galaxy…")
+            _state.value = SessionState.Starting("Invio del server al telefono…")
             val server = context.assets.open("scrcpy-server.jar").use { it.readBytes() }
             AdbSync.push(adb, server, REMOTE_PATH)
 
-            _state.value = SessionState.Starting("Avvio di DeX sul Galaxy…")
+            _state.value = SessionState.Starting("Avvio del desktop sul telefono…")
             val scid = Random.nextInt(0, Int.MAX_VALUE)
             val socket = "localabstract:scrcpy_%08x".format(scid)
             val args = buildList {
@@ -167,7 +198,7 @@ class DexSession(
             if (shellStream?.isClosed == true) break
             Thread.sleep(100)
         }
-        throw IOException("Il server sul Galaxy non risponde", last)
+        throw IOException("Il server sul telefono non risponde", last)
     }
 
     private fun startLogReader(stream: AdbStream) {
@@ -192,7 +223,7 @@ class DexSession(
     private fun runVideo(input: DataInputStream) {
         val codecId = input.readInt()
         when (codecId) {
-            0 -> throw IOException("Il Galaxy non ha fornito il video")
+            0 -> throw IOException("Il telefono non ha fornito il video")
             1 -> throw IOException("Configurazione video non valida")
         }
         val header = ByteArray(12)
@@ -340,7 +371,7 @@ class DexSession(
             val input = DataInputStream(stream.openInputStream().buffered(32 * 1024))
             val codecId = input.readInt()
             if (codecId == 0 || codecId == 1) {
-                Log.w(TAG, "Audio non disponibile sul Galaxy ($codecId)")
+                Log.w(TAG, "Audio non disponibile sul telefono ($codecId)")
                 return
             }
             val minBuffer = AudioTrack.getMinBufferSize(
@@ -423,6 +454,22 @@ class DexSession(
         }
     }
 
+    fun startApp(packageName: String) = send(ControlMessages.startApp(packageName))
+
+    /**
+     * Elenco delle app avviabili sul telefono, letto con l'opzione list_apps del server scrcpy
+     * Il server cancella il proprio file all'avvio, quindi viene copiato di nuovo in un percorso a parte.
+     * Bloccante: chiamarlo fuori dal thread UI.
+     */
+    fun listApps(): List<RemoteApp> {
+        val server = context.assets.open("scrcpy-server.jar").use { it.readBytes() }
+        AdbSync.push(adb, server, LIST_PATH)
+        val output = adb.shell(
+            "CLASSPATH=$LIST_PATH app_process / com.genymobile.scrcpy.Server $SERVER_VERSION list_apps=true log_level=info",
+        )
+        return parseAppList(output)
+    }
+
     fun setClipboard(text: String) {
         send(ControlMessages.setClipboard(clipboardSequence++, text, paste = false))
     }
@@ -446,8 +493,8 @@ class DexSession(
         val log = synchronized(serverLog) { serverLog.toList() }
         val serverError = log.lastOrNull { it.contains("ERROR") || it.contains("Exception") }
         return when {
-            serverError != null -> "Il server sul Galaxy ha segnalato un errore:\n${serverError.trim()}"
-            e is EOFException -> "La connessione con il Galaxy si è interrotta."
+            serverError != null -> "Il server sul telefono ha segnalato un errore:\n${serverError.trim()}"
+            e is EOFException -> "La connessione con il telefono si è interrotta."
             else -> e.message ?: e.javaClass.simpleName
         }
     }
@@ -456,6 +503,7 @@ class DexSession(
         private const val TAG = "Ponte"
         const val SERVER_VERSION = "5.0.1"
         private const val REMOTE_PATH = "/data/local/tmp/ponte-scrcpy-server-$SERVER_VERSION.jar"
+        private const val LIST_PATH = "/data/local/tmp/ponte-scrcpy-list-$SERVER_VERSION.jar"
         private const val FLAG_CONFIG = 1L shl 62
         private const val FLAG_KEY_FRAME = 1L shl 61
         private const val PTS_MASK = FLAG_KEY_FRAME - 1

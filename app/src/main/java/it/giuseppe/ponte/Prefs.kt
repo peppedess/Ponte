@@ -28,6 +28,8 @@ class Prefs private constructor(context: Context) {
     var deviceInfo by stringPref("info", "")
     var lastHost by stringPref("host", "")
     var lastPort by intPref("port", 0)
+    var deviceBrand by stringPref("brand", "")
+    var oneUi by intPref("oneui", 0)
 
     // Schermo e streaming
     var dpi by intPref("dpi", 0) // 0 = automatico
@@ -39,12 +41,22 @@ class Prefs private constructor(context: Context) {
 
     val isPaired: Boolean get() = deviceSerial.isNotEmpty() || lastHost.isNotEmpty()
 
+    /** Samsung con One UI 8+: sul display virtuale parte DeX. */
+    val isSamsungDex: Boolean get() = deviceBrand.equals("samsung", ignoreCase = true) && oneUi >= 80000
+
+    /** Marca nota ma non Samsung DeX: sul display virtuale compare la modalità desktop di Android (se c'è). */
+    val isGenericDesktop: Boolean get() = deviceBrand.isNotEmpty() && !isSamsungDex
+
+    val startLabel: String get() = if (isGenericDesktop) "Avvia desktop" else "Avvia DeX"
+
     fun forgetDevice() {
         deviceSerial = ""
         deviceName = ""
         deviceInfo = ""
         lastHost = ""
         lastPort = 0
+        deviceBrand = ""
+        oneUi = 0
     }
 
     private fun stringPref(key: String, default: String) =

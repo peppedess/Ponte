@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SpaceDashboard
@@ -80,13 +81,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Schermo intero con il desktop DeX del Galaxy. */
+/** Schermo intero con il desktop (DeX sui Galaxy) del telefono collegato. */
 class DexActivity : ComponentActivity() {
 
-    private val connecting = MutableStateFlow<SessionState>(SessionState.Starting("Connessione al Galaxy…"))
+    private val connecting = MutableStateFlow<SessionState>(SessionState.Starting("Connessione al telefono…"))
     private var session: DexSession? by mutableStateOf(null)
     private var forwarder: InputForwarder? = null
     private var lastSyncedClipboard: String? = null
+    private var showApps by mutableStateOf(false)
+    private val appsOfferedFor = mutableSetOf<DexSession>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,7 +123,7 @@ class DexActivity : ComponentActivity() {
         session?.close()
         session = null
         forwarder = null
-        connecting.value = SessionState.Starting("Connessione al Galaxy…")
+        connecting.value = SessionState.Starting("Connessione al telefono…")
         lifecycleScope.launch {
             try {
                 GalaxyLink.connect(this@DexActivity)
@@ -172,7 +175,7 @@ class DexActivity : ComponentActivity() {
     private fun copyToLocalClipboard(text: String) {
         lastSyncedClipboard = text
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        runCatching { clipboard.setPrimaryClip(ClipData.newPlainText("Galaxy", text)) }
+        runCatching { clipboard.setPrimaryClip(ClipData.newPlainText("Ponte", text)) }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -232,6 +235,19 @@ class DexActivity : ComponentActivity() {
 
             if (state is SessionState.Running) {
                 ControlHandle(Modifier.align(Alignment.TopCenter))
+                if (current != null) {
+                    // Fuori da Samsung il display virtuale può essere vuoto: propone subito le app
+                    LaunchedEffect(current) {
+                        if (Prefs.get(this@DexActivity).isGenericDesktop && !appsOfferedFor.contains(current)) {
+                            appsOfferedFor.add(current)
+                            delay(1_500)
+                            showApps = true
+                        }
+                    }
+                    if (showApps) {
+                        AppsSheet(current, onDismiss = { showApps = false })
+                    }
+                }
             }
         }
     }
@@ -295,7 +311,7 @@ class DexActivity : ComponentActivity() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Impossibile avviare DeX", style = MaterialTheme.typography.headlineSmall)
+                Text("Impossibile avviare il desktop", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(12.dp))
                 Text(
                     message,
@@ -359,6 +375,9 @@ class DexActivity : ComponentActivity() {
                             }
                             FilledTonalIconButton(onClick = { forwarder?.pressKey(KeyEvent.KEYCODE_APP_SWITCH) }) {
                                 Icon(Icons.Rounded.SpaceDashboard, contentDescription = "App recenti")
+                            }
+                            FilledTonalIconButton(onClick = { showApps = true }) {
+                                Icon(Icons.Rounded.Apps, contentDescription = "App")
                             }
                             FilledTonalIconButton(onClick = { finish() }) {
                                 Icon(Icons.Rounded.Close, contentDescription = "Esci")

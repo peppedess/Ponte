@@ -11,7 +11,13 @@ inoltrando tocchi, mouse, tastiera, audio e appunti.
 2. In Ponte: **Associa il Galaxy** → sul Galaxy *Associa dispositivo con codice* → inserisci il codice.
 3. Da lì in poi basta **Avvia DeX**.
 
-Linguetta in alto durante la sessione: Indietro, Home, App recenti, Esci.
+Linguetta in alto durante la sessione: Indietro, Home, App recenti, App, Esci.
+
+## Telefoni non Samsung
+Ponte funziona con qualsiasi Android 10+ con Debug wireless: al posto di DeX compare ciò che il sistema
+mostra sui display secondari (modalità desktop di Android, un launcher, oppure uno schermo vuoto).
+- **Prepara la modalità desktop** attiva finestre libere e desktop sui display esterni (poi va riavviato il telefono).
+- Il pulsante **App** della linguetta apre qualsiasi app del telefono sul display virtuale.
 
 ## Componenti di terze parti
 - `app/src/main/assets/scrcpy-server.jar`: scrcpy-server v5.0.1 © Genymobile / Romain Vimont, Apache License 2.0

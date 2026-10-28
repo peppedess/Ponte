@@ -1,6 +1,7 @@
 package it.giuseppe.ponte.ui
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Button
@@ -29,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
@@ -92,6 +96,10 @@ fun HomeScreen(onStart: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item { HeroCard(prefs, onStart = onStart, onPair = { showPair = true }) }
+                if (prefs.devices.size > 1) {
+                    item { DevicesRow(prefs) }
+                }
+                item { ControlCard(prefs) }
                 item { ScreenCard(prefs) }
                 item { StreamCard(prefs) }
                 item { GuideCard() }
@@ -169,7 +177,7 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { prefs.forgetDevice() }) { Text("Dimentica") }
-                    TextButton(onClick = onPair) { Text("Associa di nuovo") }
+                    TextButton(onClick = onPair) { Text("Aggiungi telefono") }
                 }
             } else {
                 Button(
@@ -185,6 +193,54 @@ private fun HeroCard(prefs: Prefs, onStart: () -> Unit, onPair: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** Telefoni associati: si sceglie con un tocco quale usare. */
+@Composable
+private fun DevicesRow(prefs: Prefs) {
+    val selected = prefs.current?.id
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        prefs.devices.forEach { device ->
+            FilterChip(
+                selected = device.id == selected,
+                onClick = { prefs.select(device.id) },
+                label = { Text(device.name.ifEmpty { device.host.ifEmpty { "Telefono" } }) },
+                leadingIcon = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ControlCard(prefs: Prefs) {
+    SectionCard(Icons.Rounded.TouchApp, "Controllo") {
+        val options = listOf(false to "Tocco diretto", true to "Touchpad")
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { i, (value, label) ->
+                SegmentedButton(
+                    selected = prefs.touchpad == value,
+                    onClick = { prefs.touchpad = value },
+                    shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                ) { Text(label) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (prefs.touchpad) {
+                "Lo schermo funziona come il trackpad di un portatile: un dito muove il puntatore, tocco = clic, " +
+                    "tocco con due dita = clic destro, due dita trascinate = scorrimento, doppio tocco tenendo premuto = trascina."
+            } else {
+                "Tocchi il desktop direttamente, come su un tablet."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

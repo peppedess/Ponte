@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Mouse
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.SpaceDashboard
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.Button
@@ -64,6 +67,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -93,6 +98,8 @@ class DexActivity : ComponentActivity() {
     private var showApps by mutableStateOf(false)
     private var showStats by mutableStateOf(false)
     private var wifiLock: WifiManager.WifiLock? = null
+    private var reconnectAttempts by mutableStateOf(0)
+    private var touchpad by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,6 +122,7 @@ class DexActivity : ComponentActivity() {
             }
         })
 
+        touchpad = Prefs.get(this).touchpad
         setContent {
             PonteTheme {
                 DexScreen()
@@ -123,16 +131,17 @@ class DexActivity : ComponentActivity() {
         startSession()
     }
 
-    private fun startSession() {
+    private fun startSession(reconnect: Boolean = false) {
+        if (!reconnect) reconnectAttempts = 0
         session?.close()
         session = null
         forwarder = null
-        connecting.value = SessionState.Starting("Connessione al telefono…")
+        connecting.value = SessionState.Starting(if (reconnect) "Connessione persa, mi ricollego…" else "Connessione al telefono…")
         lifecycleScope.launch {
             try {
                 GalaxyLink.connect(this@DexActivity)
             } catch (e: Exception) {
-                connecting.value = SessionState.Failed(e.message ?: "Connessione non riuscita")
+                connecting.value = SessionState.Failed(e.message ?: "Connessione non riuscita", recoverable = reconnect)
                 return@launch
             }
             val newSession = DexSession(
@@ -141,7 +150,7 @@ class DexActivity : ComponentActivity() {
                 config = buildConfig(),
                 onClipboard = { text -> runOnUiThread { copyToLocalClipboard(text) } },
             )
-            forwarder = InputForwarder(newSession)
+            forwarder = InputForwarder(newSession).also { it.touchpad = touchpad }
             session = newSession
             newSession.start()
         }
@@ -228,6 +237,18 @@ class DexActivity : ComponentActivity() {
     private fun DexScreen() {
         val current = session
         val state by (current?.state ?: connecting).collectAsState()
+
+        // Riconnessione automatica: fino a 3 tentativi se la sessione funzionava e la rete ha avuto un buco
+        val retrying = state.let { it is SessionState.Failed && it.recoverable } && reconnectAttempts < MAX_RECONNECTS
+        LaunchedEffect(state) {
+            val s = state
+            if (s is SessionState.Running) reconnectAttempts = 0
+            if (s is SessionState.Failed && s.recoverable && reconnectAttempts < MAX_RECONNECTS) {
+                reconnectAttempts++
+                delay(1_000L * reconnectAttempts)
+                startSession(reconnect = true)
+            }
+        }
         Box(
             Modifier
                 .fillMaxSize()
@@ -245,11 +266,13 @@ class DexActivity : ComponentActivity() {
                 transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.92f)) togetherWith fadeOut() },
                 label = "stato",
             ) { s ->
-                when (s) {
-                    is SessionState.Starting -> StartingPanel(s.step)
-                    is SessionState.Failed -> FailurePanel(s.message)
-                    SessionState.Closed -> FailurePanel("La sessione è terminata.")
-                    is SessionState.Running -> Box(Modifier.fillMaxSize())
+                when {
+                    s is SessionState.Failed && retrying ->
+                        StartingPanel("Connessione persa, mi ricollego… ($reconnectAttempts/$MAX_RECONNECTS)")
+                    s is SessionState.Starting -> StartingPanel(s.step)
+                    s is SessionState.Failed -> FailurePanel(s.message)
+                    s is SessionState.Closed -> FailurePanel("La sessione è terminata.")
+                    else -> Box(Modifier.fillMaxSize())
                 }
             }
 
@@ -280,8 +303,43 @@ class DexActivity : ComponentActivity() {
     @SuppressLint("ClickableViewAccessibility")
     @Composable
     private fun VideoSurface(current: DexSession, ratio: Float) {
+        Box(Modifier.aspectRatio(ratio.takeIf { it.isFinite() && it > 0f } ?: (16f / 9f))) {
+            VideoView(current)
+            if (touchpad) CursorOverlay(current)
+        }
+    }
+
+    /** Puntatore della modalità touchpad, disegnato sopra il video. */
+    @Composable
+    private fun CursorOverlay(current: DexSession) {
+        val f = forwarder ?: return
+        val cursor by f.cursor.collectAsState()
+        val size by current.videoSize.collectAsState()
+        val c = cursor ?: return
+        Canvas(Modifier.fillMaxSize()) {
+            val x = c.first / size.first * this.size.width
+            val y = c.second / size.second * this.size.height
+            val s = 22.dp.toPx()
+            val arrow = Path().apply {
+                moveTo(x, y)
+                lineTo(x, y + s)
+                lineTo(x + s * 0.28f, y + s * 0.74f)
+                lineTo(x + s * 0.5f, y + s * 1.1f)
+                lineTo(x + s * 0.64f, y + s * 1.03f)
+                lineTo(x + s * 0.42f, y + s * 0.68f)
+                lineTo(x + s * 0.76f, y + s * 0.68f)
+                close()
+            }
+            drawPath(arrow, Color.Black)
+            drawPath(arrow, Color.White, style = Stroke(width = 1.5.dp.toPx()))
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    @Composable
+    private fun VideoView(current: DexSession) {
         AndroidView(
-            modifier = Modifier.aspectRatio(ratio.takeIf { it.isFinite() && it > 0f } ?: (16f / 9f)),
+            modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 object : SurfaceView(context) {
                     override fun onTouchEvent(event: MotionEvent): Boolean =
@@ -401,6 +459,16 @@ class DexActivity : ComponentActivity() {
                             FilledTonalIconButton(onClick = { forwarder?.pressKey(KeyEvent.KEYCODE_APP_SWITCH) }) {
                                 Icon(Icons.Rounded.SpaceDashboard, contentDescription = "App recenti")
                             }
+                            FilledTonalIconButton(onClick = {
+                                touchpad = !touchpad
+                                forwarder?.touchpad = touchpad
+                                Prefs.get(this@DexActivity).touchpad = touchpad
+                            }) {
+                                Icon(
+                                    if (touchpad) Icons.Rounded.Mouse else Icons.Rounded.TouchApp,
+                                    contentDescription = if (touchpad) "Touchpad" else "Tocco diretto",
+                                )
+                            }
                             FilledTonalIconButton(onClick = { showStats = !showStats }) {
                                 Icon(Icons.Rounded.Speed, contentDescription = "Statistiche")
                             }
@@ -418,6 +486,8 @@ class DexActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val MAX_RECONNECTS = 3
+
         /** Densità predefinita: circa il 60% di quella del dispositivo, a multipli di 10. */
         fun autoDpi(context: Context): Int {
             val device = context.resources.displayMetrics.densityDpi

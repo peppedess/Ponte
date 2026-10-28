@@ -6,17 +6,25 @@ import it.giuseppe.ponte.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class LinkException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
-/** Associazione e connessione al Galaxy tramite Debug wireless. */
+/** Associazione e connessione al telefono selezionato tramite Debug wireless. */
 object GalaxyLink {
 
     data class DeviceInfo(val name: String, val details: String, val oneUi: Int, val brand: String) {
         val isSamsung: Boolean get() = brand.equals("samsung", ignoreCase = true)
     }
 
-    /** Associa Ponte al Galaxy con il codice a 6 cifre e verifica subito la connessione. */
+    /** Id del telefono a cui è collegata adesso la connessione ADB (una sola alla volta). */
+    @Volatile
+    private var connectedId: String? = null
+
+    /** Associa Ponte a un telefono con il codice a 6 cifre, lo salva e verifica subito la connessione. */
     suspend fun pair(context: Context, host: String, port: Int, code: String, serial: String) =
         withContext(Dispatchers.IO) {
             val adb = PonteAdb.get(context)
@@ -25,33 +33,34 @@ object GalaxyLink {
             } catch (e: Exception) {
                 throw LinkException("Associazione non riuscita: controlla il codice e riprova.", e)
             }
-            val prefs = Prefs.get(context)
-            prefs.deviceSerial = serial
-            prefs.lastHost = host
-            prefs.lastPort = 0
-            val info = connect(context)
-            info
+            Prefs.get(context).addPairedDevice(serial, host)
+            connect(context)
         }
 
     /**
-     * Si collega al Galaxy associato: prima prova l'ultimo indirizzo noto (immediato), poi cerca
+     * Si collega al telefono selezionato: prima prova l'ultimo indirizzo noto (immediato), poi cerca
      * in rete la porta attuale del Debug wireless (cambia ogni volta che viene riattivato).
      */
     suspend fun connect(context: Context): DeviceInfo = withContext(Dispatchers.IO) {
         val adb = PonteAdb.get(context)
         val prefs = Prefs.get(context)
+        val device = prefs.current ?: throw LinkException("Nessun telefono associato.")
 
-        if (adb.isConnected && isAlive(adb)) {
+        if (adb.isConnected && connectedId == device.id && isAlive(adb)) {
             return@withContext readInfo(adb, prefs)
         }
         adb.disconnectQuietly()
+        connectedId = null
 
         var lastError: Throwable? = null
         // Prima verifica veloce che la porta risponda: altrimenti il timeout TCP di sistema
         // (anche un minuto) bloccherebbe la schermata su "Connessione al telefono…"
-        if (prefs.lastHost.isNotEmpty() && prefs.lastPort > 0 && isReachable(prefs.lastHost, prefs.lastPort)) {
+        if (device.host.isNotEmpty() && device.port > 0 && isReachable(device.host, device.port)) {
             try {
-                if (adb.connect(prefs.lastHost, prefs.lastPort)) return@withContext readInfo(adb, prefs)
+                if (adb.connect(device.host, device.port)) {
+                    connectedId = device.id
+                    return@withContext readInfo(adb, prefs)
+                }
             } catch (e: AdbPairingRequiredException) {
                 throw LinkException("Il telefono non riconosce più Ponte: associalo di nuovo.", e)
             } catch (e: Exception) {
@@ -60,14 +69,10 @@ object GalaxyLink {
             }
         }
 
-        val serial = prefs.deviceSerial
         val service = AdbDiscovery(context).findConnectService(8_000) { s ->
-            when {
-                serial.isNotEmpty() -> s.serial == serial || s.host == prefs.lastHost
-                else -> s.host == prefs.lastHost
-            }
+            if (device.serial.isNotEmpty()) s.serial == device.serial || s.host == device.host else s.host == device.host
         } ?: throw LinkException(
-            "Telefono non trovato. Attiva Opzioni sviluppatore → Debug wireless " +
+            "${device.name.ifEmpty { "Telefono" }} non trovato. Attiva Opzioni sviluppatore → Debug wireless " +
                 "e verifica che i due dispositivi siano sulla stessa rete Wi-Fi.",
             lastError,
         )
@@ -87,16 +92,16 @@ object GalaxyLink {
             adb.disconnectQuietly()
             throw LinkException("Connessione al telefono non riuscita (${e.message ?: e.javaClass.simpleName}).", e)
         }
-        prefs.lastHost = service.host
-        prefs.lastPort = service.port
+        connectedId = device.id
+        prefs.updateCurrent { it.copy(host = service.host, port = service.port) }
         readInfo(adb, prefs)
     }
 
     /** La connessione esistente risponde ancora? Con un timeout: se il Wi-Fi è caduto, aprire un flusso resta appeso. */
     private fun isAlive(adb: PonteAdb): Boolean {
-        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val executor = Executors.newSingleThreadExecutor()
         return try {
-            executor.submit<Boolean> { adb.shell("echo ok") == "ok" }.get(3, java.util.concurrent.TimeUnit.SECONDS)
+            executor.submit<Boolean> { adb.shell("echo ok") == "ok" }.get(3, TimeUnit.SECONDS)
         } catch (_: Exception) {
             false
         } finally {
@@ -106,7 +111,7 @@ object GalaxyLink {
 
     private fun isReachable(host: String, port: Int, timeoutMs: Int = 1_500): Boolean =
         runCatching {
-            java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, port), timeoutMs) }
+            Socket().use { it.connect(InetSocketAddress(host, port), timeoutMs) }
             true
         }.getOrDefault(false)
 
@@ -114,23 +119,29 @@ object GalaxyLink {
         val props = adb.shell(
             "echo \"$(getprop ro.product.marketname)|$(getprop ro.product.model)|" +
                 "$(getprop ro.build.version.release)|$(getprop ro.build.version.oneui)|" +
-                "$(getprop ro.product.manufacturer)\"",
+                "$(getprop ro.product.manufacturer)|$(getprop ro.serialno)\"",
         ).split('|')
         val market = props.getOrNull(0).orEmpty().trim()
         val model = props.getOrNull(1).orEmpty().trim()
         val android = props.getOrNull(2).orEmpty().trim()
         val oneUi = props.getOrNull(3)?.trim()?.toIntOrNull() ?: 0
         val brand = props.getOrNull(4).orEmpty().trim()
+        val serial = props.getOrNull(5).orEmpty().trim()
         val name = market.ifEmpty { model.ifEmpty { brand.replaceFirstChar { it.uppercase() }.ifEmpty { "Telefono" } } }
         val details = buildString {
             if (oneUi > 0) append("One UI ${oneUiLabel(oneUi)} · ")
             append("Android $android")
             if (market.isNotEmpty() && model.isNotEmpty() && market != model) append(" · $model")
         }
-        prefs.deviceName = name
-        prefs.deviceInfo = details
-        prefs.deviceBrand = brand
-        prefs.oneUi = oneUi
+        prefs.updateCurrent {
+            it.copy(
+                name = name,
+                info = details,
+                brand = brand,
+                oneUi = oneUi,
+                serial = it.serial.ifEmpty { serial },
+            )
+        }
         return DeviceInfo(name, details, oneUi, brand)
     }
 

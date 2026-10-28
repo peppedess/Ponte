@@ -72,7 +72,8 @@ fun parseAppList(output: String): List<RemoteApp> {
 sealed interface SessionState {
     data class Starting(val step: String) : SessionState
     data class Running(val deviceName: String) : SessionState
-    data class Failed(val message: String) : SessionState
+    /** [recoverable]: la sessione funzionava e si è interrotta la connessione (si può riprovare da soli). */
+    data class Failed(val message: String, val recoverable: Boolean = false) : SessionState
     data object Closed : SessionState
 }
 
@@ -95,6 +96,7 @@ class DexSession(
     val videoSize: StateFlow<Pair<Int, Int>> = _videoSize.asStateFlow()
 
     @Volatile private var closed = false
+    @Volatile private var reachedRunning = false
     private val serverLog = ArrayDeque<String>()
 
     private var shellStream: AdbStream? = null
@@ -187,11 +189,12 @@ class DexSession(
             controlStream?.let { stream -> Thread({ runDeviceMessages(stream) }, "ponte-device-msg").start() }
 
             _state.value = SessionState.Running(deviceName)
+            reachedRunning = true
             runVideo(videoIn)
         } catch (e: Throwable) {
             if (!closed) {
                 Log.e(TAG, "Sessione terminata", e)
-                _state.value = SessionState.Failed(describe(e))
+                _state.value = SessionState.Failed(describe(e), recoverable = reachedRunning && !hasServerError())
             }
         } finally {
             close()
@@ -568,6 +571,10 @@ class DexSession(
             lowLatencyForced = false
             Thread { runCatching { adb.shell("cmd wifi force-low-latency-mode disabled") } }.start()
         }
+    }
+
+    private fun hasServerError(): Boolean = synchronized(serverLog) {
+        serverLog.any { it.contains("ERROR") || it.contains("Exception") }
     }
 
     private fun describe(e: Throwable): String {

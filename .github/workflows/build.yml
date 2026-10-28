@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,6 +36,7 @@ jobs:
         run: |
           mkdir -p apk
           cp app/build/outputs/apk/release/*.apk "apk/Ponte-${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/*.apk apk/Ponte.apk
 
       # APK scaricabile direttamente, senza zip
       - uses: actions/upload-artifact@v7
@@ -40,3 +44,15 @@ jobs:
           name: Ponte-${{ github.run_number }}.apk
           path: apk/Ponte-${{ github.run_number }}.apk
           archive: false
+
+      # Link fisso all'ultima versione: /releases/latest/download/Ponte.apk
+      - name: Pubblica la release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v0.1.${{ github.run_number }}"
+          gh release create "$tag" apk/Ponte.apk \
+            --title "Ponte $tag" \
+            --notes "Build ${{ github.run_number }} (${GITHUB_SHA::7})" \
+            --latest

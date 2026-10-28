@@ -14,11 +14,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.ConscryptMode
 import org.robolectric.annotation.GraphicsMode
 
 /** Screenshot delle schermate principali, pubblicati dalla CI sul ramo "rapporto". */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// conscrypt-android è nelle dipendenze dell'app ma non ha librerie native per la JVM dei test
+@ConscryptMode(ConscryptMode.Mode.OFF)
 @Config(sdk = [35], application = Application::class, qualifiers = "it-rIT-w411dp-h891dp-xxhdpi")
 class ScreenshotTest {
 

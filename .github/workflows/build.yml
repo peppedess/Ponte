@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Compila
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Errori
+        if: failure()
+        run: |
+          grep -E "^e: |What went wrong|Could not" -A3 build.log || tail -n 60 build.log
+
+      - name: Prepara l'APK
+        run: |
+          mkdir -p apk
+          cp app/build/outputs/apk/release/*.apk "apk/Ponte-${{ github.run_number }}.apk"
+
+      # APK scaricabile direttamente, senza zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Ponte-${{ github.run_number }}.apk
+          path: apk/Ponte-${{ github.run_number }}.apk
+          archive: false

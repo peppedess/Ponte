@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -38,22 +40,20 @@ jobs:
           msg=$(head -n 80 errori.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::error title=Errori di compilazione::$msg"
 
-      # Il registro di compilazione completo sul ramo "rapporto" (anche quando la build riesce)
-      - name: Pubblica il rapporto
-        if: always()
+      - name: Test e screenshot
         run: |
-          mkdir -p rapporto
-          if [ -f build.log ]; then cp build.log rapporto/build.log; fi
-          if [ -f errori.txt ]; then cp errori.txt rapporto/errori.txt; fi
-          if [ -f test.log ]; then cp test.log rapporto/test.log; fi
-          if [ -d app/build/outputs/roborazzi ]; then cp -r app/build/outputs/roborazzi rapporto/screenshot; fi
-          if [ -d app/build/test-results ]; then cp -r app/build/test-results rapporto/risultati-test; fi
-          cd rapporto
-          git init -q
-          git checkout -q -b rapporto
-          git add -A
-          git -c user.name="github-actions[bot]" -c user.email="41898299+github-actions[bot]@users.noreply.github.com" commit -q -m "Rapporto ${{ github.sha }}"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" rapporto
+          set -o pipefail
+          gradle testDebugUnitTest --no-daemon 2>&1 | tee test.log
+
+      - name: Test falliti
+        if: failure()
+        run: |
+          if [ -f test.log ]; then
+            grep -E "FAILED|^e: |Exception|Error" -A4 test.log | head -n 120 > test-falliti.txt || tail -n 80 test.log > test-falliti.txt
+            cat test-falliti.txt
+            msg=$(head -n 60 test-falliti.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Test falliti::$msg"
+          fi
 
       - name: Prepara l'APK
         run: |
@@ -69,13 +69,43 @@ jobs:
           archive: false
 
       # Link fisso all'ultima versione: /releases/latest/download/Ponte.apk
+      # Le note di rilascio elencano i commit dalla versione precedente.
       - name: Pubblica la release
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v0.1.${{ github.run_number }}"
+          tag="v0.2.${{ github.run_number }}"
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          {
+            echo "## Novità"
+            if [ -n "$prev" ]; then
+              git log "$prev"..HEAD --no-merges --pretty=format:'- %s' | grep -v "^- Rapporto" || true
+            else
+              git log -20 --no-merges --pretty=format:'- %s'
+            fi
+            echo
+            echo
+            echo "Scarica **Ponte.apk** qui sotto e installalo sopra la versione precedente."
+          } > note.md
           gh release create "$tag" apk/Ponte.apk \
             --title "Ponte $tag" \
-            --notes "Build ${{ github.run_number }} (${GITHUB_SHA::7})" \
+            --notes-file note.md \
             --latest
+
+      # Registro di compilazione, test e screenshot sul ramo "rapporto"
+      - name: Pubblica il rapporto
+        if: always()
+        run: |
+          mkdir -p rapporto
+          for f in build.log errori.txt test.log test-falliti.txt; do
+            if [ -f "$f" ]; then cp "$f" rapporto/; fi
+          done
+          if [ -d app/screenshots ]; then cp -r app/screenshots rapporto/screenshot; fi
+          if [ -d app/build/test-results ]; then cp -r app/build/test-results rapporto/risultati-test; fi
+          cd rapporto
+          git init -q
+          git checkout -q -b rapporto
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898299+github-actions[bot]@users.noreply.github.com" commit -q -m "Rapporto ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" rapporto

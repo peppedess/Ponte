@@ -14,13 +14,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.DesktopWindows
+import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.LinkOff
@@ -80,6 +91,7 @@ import kotlin.math.roundToInt
 fun HomeScreen(onStart: () -> Unit, onAddDevice: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { Prefs.get(context) }
+    var showLicenses by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
@@ -97,26 +109,34 @@ fun HomeScreen(onStart: () -> Unit, onAddDevice: () -> Unit) {
                             text = { Text("Esporta registro") },
                             onClick = { menu = false; Diag.share(context) },
                         )
+                        DropdownMenuItem(
+                            text = { Text("Licenze e informazioni") },
+                            onClick = { menu = false; showLicenses = true },
+                        )
                     }
                 },
                 scrollBehavior = scroll,
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(
-                modifier = Modifier.widthIn(max = 640.dp),
+        // Su tablet e schermi larghi le schede si dispongono su due colonne
+        BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            val columns = if (maxWidth >= 760.dp) 2 else 1
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(columns),
+                modifier = Modifier.widthIn(max = if (columns == 2) 1100.dp else 640.dp),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
                     top = padding.calculateTopPadding() + 4.dp,
                     bottom = padding.calculateBottomPadding() + 24.dp,
                 ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalItemSpacing = 16.dp,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item { HeroCard(prefs, onStart = onStart, onPair = onAddDevice) }
+                item(span = StaggeredGridItemSpan.FullLine) { HeroCard(prefs, onStart = onStart, onPair = onAddDevice) }
                 if (prefs.devices.size > 1) {
-                    item { DevicesRow(prefs) }
+                    item(span = StaggeredGridItemSpan.FullLine) { DevicesRow(prefs) }
                 }
                 item { ControlCard(prefs) }
                 item { ScreenCard(prefs) }
@@ -126,6 +146,9 @@ fun HomeScreen(onStart: () -> Unit, onAddDevice: () -> Unit) {
         }
     }
 
+    if (showLicenses) {
+        LicensesSheet(onDismiss = { showLicenses = false })
+    }
 }
 
 @Composable
@@ -337,6 +360,9 @@ private fun ScreenCard(prefs: Prefs) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(12.dp))
+        DesktopPreview(longSide, shortSide, dpi)
+        Spacer(Modifier.height(4.dp))
         Slider(
             value = dpi.toFloat(),
             onValueChange = { prefs.dpi = (it / 10f).roundToInt() * 10 },
@@ -367,6 +393,54 @@ private fun ScreenCard(prefs: Prefs) {
                     Text(if (option == Resolution.FULL) "Piena (${longSide}×$shortSide)" else "Ridotta, più fluida")
                 }
             }
+        }
+    }
+}
+
+/**
+ * Anteprima in scala del desktop: barra delle applicazioni e una finestra di 360×240 dp,
+ * per capire subito quanto spazio dà la densità scelta.
+ */
+@Composable
+private fun DesktopPreview(longSide: Int, shortSide: Int, dpi: Int) {
+    val colors = MaterialTheme.colorScheme
+    val animatedDpi by animateFloatAsState(dpi.toFloat(), label = "dpi")
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(longSide.toFloat() / shortSide)
+            .clip(RoundedCornerShape(16.dp)),
+    ) {
+        val scale = size.width / longSide
+        val dpPx = animatedDpi / 160f * scale
+        drawRect(colors.tertiaryContainer)
+        // Barra delle applicazioni (48 dp)
+        val bar = 48f * dpPx
+        drawRect(colors.surfaceContainerHighest, topLeft = Offset(0f, size.height - bar), size = Size(size.width, bar))
+        val icon = 28f * dpPx
+        repeat(5) { i ->
+            drawCircle(
+                colors.primary,
+                radius = icon / 2,
+                center = Offset(size.width / 2 + (i - 2) * icon * 1.5f, size.height - bar / 2),
+            )
+        }
+        // Una finestra di 360×240 dp
+        val w = 360f * dpPx
+        val h = 240f * dpPx
+        val left = 24f * dpPx
+        val top = 24f * dpPx
+        drawRoundRect(colors.surface, topLeft = Offset(left, top), size = Size(w, h), cornerRadius = CornerRadius(12f * dpPx))
+        drawRoundRect(
+            colors.primaryContainer, topLeft = Offset(left, top), size = Size(w, 32f * dpPx),
+            cornerRadius = CornerRadius(12f * dpPx),
+        )
+        repeat(4) { i ->
+            drawRect(
+                colors.outlineVariant,
+                topLeft = Offset(left + 16f * dpPx, top + (56f + i * 28f) * dpPx),
+                size = Size(w * (0.8f - i * 0.12f), 12f * dpPx),
+            )
         }
     }
 }
@@ -424,15 +498,15 @@ private fun StreamCard(prefs: Prefs) {
 
 @Composable
 private fun GuideCard() {
-    SectionCard(Icons.Rounded.Wifi, "Prima di iniziare") {
-        val steps = listOf(
-            "Galaxy con One UI 8 o successiva: DeX parte da solo. Altri telefoni: compare la modalità desktop di Android, se disponibile, oppure apri le app dalla linguetta in alto.",
-            "I due dispositivi devono essere sulla stessa rete Wi-Fi.",
-            "Sul telefono da usare: Impostazioni → Opzioni sviluppatore → Debug wireless attivo.",
-            "Per l'associazione: Debug wireless → Associa dispositivo con codice, poi inserisci il codice qui.",
-            "Utile: aggiungi il riquadro rapido \"Debug wireless\" dalle Opzioni sviluppatore.",
+    SectionCard(Icons.Rounded.Lightbulb, "Scorciatoie utili") {
+        val tips = listOf(
+            "Riquadro rapido: modifica le Impostazioni rapide e aggiungi \"DeX\" di Ponte per partire con un tocco.",
+            "Widget: tieni premuto sulla Home → Widget → Ponte.",
+            "Dalla condivisione di qualsiasi app: \"Invia al telefono\" copia i file in Download/Ponte del telefono collegato.",
+            "Durante la sessione, \"Riduci\" ti riporta qui lasciando il desktop collegato: torni dalla notifica.",
+            "Sul telefono collegato aggiungi il riquadro rapido \"Debug wireless\" dalle Opzioni sviluppatore.",
         )
-        steps.forEachIndexed { i, step ->
+        tips.forEachIndexed { i, tip ->
             Row(Modifier.padding(vertical = 6.dp)) {
                 Surface(
                     shape = CircleShape,
@@ -444,7 +518,7 @@ private fun GuideCard() {
                     }
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(step, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text(tip, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             }
         }
     }

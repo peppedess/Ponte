@@ -6,6 +6,12 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
+    <style name="Theme.Ponte.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Ponte</item>
+    </style>
+
     <style name="Theme.Ponte.Translucent" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
